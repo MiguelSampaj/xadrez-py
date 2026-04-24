@@ -1,7 +1,16 @@
 from customtkinter import *
+from PIL import Image
 
 # Variaveis
 letras = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
+
+# Imagens
+PEAO_BRANCO = CTkImage(light_image=Image.open('peão_branco.png'),
+                       dark_image=Image.open('peão_branco.png'),
+                       size=(50, 62))
+PEAO_PRETO = CTkImage(light_image=Image.open('peão_preto.png'),
+                       dark_image=Image.open('peão_preto.png'),
+                       size=(50, 62))
 
 # Configs
 set_appearance_mode('dark')
@@ -50,17 +59,54 @@ class FrameTab(CTkFrame):
 def func_casa(obj):
     print(obj.pos)
 
-class Casa(CTkButton):
-    def __init__(self, master, pos, **kwargs):
-        super().__init__(master, **kwargs, width=80, height=80, corner_radius=0, text='', command=lambda: func_casa(self))
+class Casa(CTkFrame):
+    def __init__(self, master, pos, tem_peca, **kwargs):
+        super().__init__(master, **kwargs, width=80, height=80, corner_radius=0)
         self.grid_propagate(False)
 
+        self.bind('<Button-1>', lambda e: func_casa(self))
+
         self.pos = pos
+        self.tem_peca = tem_peca
+
+# Peças
+# Base
+def criar_circulos(*casas, peca):
+    pass
+
+class Peca(CTkButton):
+    def __init__(self, master, color, value, pos, **kwargs):
+        super().__init__(master,
+                         **kwargs,
+                         fg_color='transparent',
+                         bg_color='transparent',
+                         hover=False,
+                         text='aaaaaa')
+        self.color = color
+        self.value = value
+        self.pos = pos
+
+# Peão
+def peao(peca):
+    pass
+
+class Peao(Peca):
+    def __init__(self, master, color, pos, **kwargs):
+        super().__init__(master, color=color, value=1, pos=pos, **kwargs, width=50, height=62, command=lambda: peao(self))
+
+        self.jogou = False
+        self.color = color
+        self.pos = pos
+
+        if self.color == 'branco':
+            self.configure(image=PEAO_BRANCO, text_color=pos.cget('fg_color'))
+        elif self.color == 'preto':
+            self.configure(image=PEAO_PRETO, text_color=pos.cget('fg_color'))
 
 def criar_casas(master):
     casas = []
-    color_um = '#000000'
-    color_dois = '#FFFFFF'
+    color_um = ['#000000', 'preto']
+    color_dois = ['#FFFFFF', 'branco']
     cont = 9
 
     for x in range(8):
@@ -68,11 +114,20 @@ def criar_casas(master):
         cont -= 1
         for y in range(8):
             if (y + 1) % 2 == 0:
-                casa = Casa(master, fg_color=color_um, pos=[letras[y], cont])
-                casa.configure(hover_color=color_um)
+                casa = Casa(master, fg_color=color_um[0], pos=[letras[y], cont], tem_peca=[False, None])
             else:
-                casa = Casa(master, fg_color=color_dois, pos=[letras[y], cont])
-                casa.configure(hover_color=color_dois)
+                casa = Casa(master, fg_color=color_dois[0], pos=[letras[y], cont], tem_peca=[False, None])
+
+            # Criando as peças
+            # Peão
+            if x == 1 or x == 6:
+                if x == 1:
+                    peao = Peao(casa, color='preto', pos=casa)
+                else:
+                    peao = Peao(casa, color='branco', pos=casa)
+
+                casa.tem_peca = [True, 'peao']
+                peao.grid(row=0, column=0, padx=7, pady=5)
 
             casas.append(casa)
 
