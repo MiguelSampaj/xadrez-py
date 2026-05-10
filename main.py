@@ -5,6 +5,8 @@ from rich.traceback import install
 install()
 
 # Variaveis
+material_branco = material_preto = 0
+vez = True
 act_peca = None
 letras = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h']
 pecas_em_jogo = []
@@ -27,12 +29,29 @@ class Circle(CTkFrame):
         self.raio = self.diametro / 2
         self.origem = origem
 
-        super().__init__(master, **kwargs, width=self.diametro, height=self.diametro, corner_radius=self.diametro)
+        super().__init__(master,
+                         **kwargs,
+                         width=self.diametro,
+                         height=self.diametro,
+                         corner_radius=self.diametro)
 
 class CasasCircle(Circle):
     def __init__(self, master, origem, **kwargs):
-        super().__init__(master, fg_color='#505050',
+        super().__init__(master,
+                         fg_color='#505050',
                          diametro=30,
+                         border_width=3,
+                         border_color='#101010',
+                         origem=origem,
+                         **kwargs)
+
+        self.bind('<Button-1>', lambda e: func_casa(master))
+
+class ComerCircle(Circle):
+    def __init__(self, master, origem, **kwargs):
+        super().__init__(master,
+                         fg_color='transparent',
+                         diametro=75,
                          border_width=3,
                          border_color='#101010',
                          origem=origem,
@@ -50,17 +69,23 @@ class FrameHud(CTkFrame):
         self.cor = cor
 
         if self.cor == 'branco':
-            circulo = Circle(self, fg_color='#fafafa', diametro=40, origem=None)
-            circulo.grid(column=0, row=0, padx=(20, 0), pady=125 / 2 - 20)
+            self.circulo = Circle(self, fg_color='#fafafa', diametro=40, origem=None)
+            self.circulo.grid(column=0, row=0, padx=(20, 0), pady=125 / 2 - 20)
 
-            lbl_name = LabelHud(self, text='Branco', text_color='#dfdfdf')
-            lbl_name.grid(column=1, row=0, padx=15, pady=0)
+            self.lbl_name = LabelHud(self, text='Branco', text_color='#dfdfdf')
+            self.lbl_name.grid(column=1, row=0, padx=15, pady=0)
+
+            self.lbl_material = LabelHud(self, text='0', text_color='#dfdfdf')
+            self.lbl_material.grid(column=2, row=0, padx=80, pady=0)
         elif self.cor == 'preto':
-            circulo = Circle(self, fg_color='#101010', diametro=40, origem=None)
-            circulo.grid(column=0, row=0, padx=(20, 0), pady=125 / 2 - 20)
+            self.circulo = Circle(self, fg_color='#101010', diametro=40, origem=None)
+            self.circulo.grid(column=0, row=0, padx=(20, 0), pady=125 / 2 - 20)
 
-            lbl_name = LabelHud(self, text='Preto', text_color='#000000')
-            lbl_name.grid(column=1, row=0, padx=15, pady=0)
+            self.lbl_name = LabelHud(self, text='Preto', text_color='#000000')
+            self.lbl_name.grid(column=1, row=0, padx=15, pady=0)
+
+            self.lbl_material = LabelHud(self, text='0', text_color='#000000')
+            self.lbl_material.grid(column=2, row=0, padx=80, pady=0)
 
 class FrameTab(CTkFrame):
     def __init__(self, master, **kwargs):
@@ -79,6 +104,20 @@ def atualizar_casas_livres(casas):
     return casas_livres
 
 def func_casa(obj):
+    global vez, material_preto, material_branco
+
+    jogar(obj)
+
+    if obj.cget('fg_color') != '#999900':
+        reset_cores(obj.master.casas)
+    else:
+        if obj.color == 'branco':
+            material_preto += obj.tem_peca[1].value
+        else:
+            material_branco += obj.tem_peca[1].value
+
+        atualizar_hud_material()
+
     for casa in obj.master.casas:
         if casa.tem_peca[0]:
             tirar_circulos(casa.tem_peca[1])
@@ -141,7 +180,7 @@ def criar_circulos(casas, casas_livres, peca):
             circulo_dois = None
 
             for casa in casas:
-                if peca.color == 'branco':
+                if peca.color == 'branco' and vez:
                     if casa.pos == [pos_peca[0], pos_peca[1] + 1] and not casa.tem_peca[0]:
                         casa_um_frente = casa
                         circulo_um = CasasCircle(casa, peca)
@@ -152,7 +191,7 @@ def criar_circulos(casas, casas_livres, peca):
                         circulo_dois = CasasCircle(casa, peca)
                         casa.circle = circulo_dois
 
-                elif peca.color == 'preto':
+                elif peca.color == 'preto' and not vez:
                     if casa.pos == [pos_peca[0], pos_peca[1] - 1] and not casa.tem_peca[0]:
                         casa_um_frente = casa
                         circulo_um = CasasCircle(casa, peca)
@@ -163,14 +202,26 @@ def criar_circulos(casas, casas_livres, peca):
                         circulo_dois = CasasCircle(casa, peca)
                         casa.circle = circulo_dois
 
-            if casa_um_frente.pos[1] > 7 or casa_dois_frente.pos[1] > 7:
-                pass
-            else:
-                if casa_um_frente in casas_livres:
+            cond_um = False
+            cond_dois = False
+
+            if casa_um_frente is not None:
+                cond_um = casa_um_frente.pos[1] > 7
+                cond_dois = casa_um_frente.tem_peca[0]
+
+                if (cond_um or cond_dois) and casa_um_frente not in casas_livres:
+                    pass
+                else:
                     circulo_um.grid(padx=25, pady=25)
                     peca.casas_jogar.append(casa_um_frente)
 
-                if casa_dois_frente in casas_livres:
+            if casa_dois_frente is not None:
+                cond_um = casa_dois_frente.pos[1] > 7
+                cond_dois = casa_dois_frente.tem_peca[0]
+
+                if (cond_um or cond_dois) and casa_dois_frente not in casas_livres:
+                    pass
+                else:
                     circulo_dois.grid(padx=25, pady=25)
                     peca.casas_jogar.append(casa_dois_frente)
         else:
@@ -179,41 +230,201 @@ def criar_circulos(casas, casas_livres, peca):
             circulo = None
 
             for casa in casas:
-                if peca.color == 'branco':
+                if peca.color == 'branco' and vez:
                     if casa.pos == [pos_peca[0], pos_peca[1] + 1] and not casa.tem_peca[0]:
                         casa_um_frente = casa
                         circulo = CasasCircle(casa_um_frente, peca)
                         casa.circle = circulo
-                elif peca.color == 'preto':
+                elif peca.color == 'preto' and not vez:
                     if casa.pos == [pos_peca[0], pos_peca[1] - 1] and not casa.tem_peca[0]:
                         casa_um_frente = casa
                         circulo = CasasCircle(casa_um_frente, peca)
                         casa.circle = circulo
 
-            if casa_um_frente.pos[1] > 7:
-                pass
-            else:
-                if casa_um_frente in casas_livres and not casa_um_frente.tem_peca[0]:
-                    circulo.grid(padx=25, pady=25)
-                    peca.casas_jogar.append(casa_um_frente)
+            if casa_um_frente is not None:
+                if casa_um_frente.pos[1] > 7:
+                    pass
+                else:
+                    if casa_um_frente in casas_livres and not casa_um_frente.tem_peca[0]:
+                        circulo.grid(padx=25, pady=25)
+                        peca.casas_jogar.append(casa_um_frente)
 
+# Função que tira os circulos
 def tirar_circulos(peca):
     if len(peca.casas_jogar) > 0:
         for casa in peca.casas_jogar:
             casa.circle.destroy()
+            casa.circle = None
 
         peca.casas_jogar.clear()
+
+# Reseta os fg_colors originais das casas
+def reset_cores(casas):
+    color_um = ['#FAFAFA', 'branco']
+    color_dois = ['#004500', 'preto']
+    y = 0
+
+    for i, casa in enumerate(casas):
+        if (i + 1) % 2 == 0:
+            casa.configure(fg_color=color_um[0])
+
+            if casa.tem_peca[0]:
+                casa.tem_peca[1].configure(text_color=color_um[0])
+        else:
+            casa.configure(fg_color=color_dois[0])
+
+            if casa.tem_peca[0]:
+                casa.tem_peca[1].configure(text_color=color_dois[0])
+
+        y += 1
+
+        if y >= 8:
+            y = 0
+
+            color_um, color_dois = color_dois, color_um
+
+# Função que atualiza o quanto de material está de diferença
+def atualizar_hud_material():
+    global material_branco, material_preto
+
+    diferenca_branco = material_branco - material_preto
+    diferenca_preto = diferenca_branco * -1
+
+    if diferenca_preto > diferenca_branco:
+        app.frame_hud_branco.lbl_material.configure(text=f'-{diferenca_preto}')
+        app.frame_hud_preto.lbl_material.configure(text=f'+{diferenca_preto}')
+    elif diferenca_preto < diferenca_branco:
+        app.frame_hud_branco.lbl_material.configure(text=f'+{diferenca_branco}')
+        app.frame_hud_preto.lbl_material.configure(text=f'-{diferenca_branco}')
+    else:
+        app.frame_hud_branco.lbl_material.configure(text='0')
+        app.frame_hud_preto.lbl_material.configure(text='0')
+
+# Função para jogar
+def jogar(casa):
+    global vez, material_preto, material_branco
+
+    if casa.circle is not None or casa.cget('fg_color') == '#999900':
+        if casa.cget('fg_color') == '#999900':
+            casa.tem_peca[1].destroy()
+            casa.tem_peca = [False, None]
+
+        peca_antiga = casa.circle.origem
+
+        casa_antiga = peca_antiga.master
+        nova_peca = None
+
+        cor = peca_antiga.color
+        tipo = peca_antiga.tipo
+        casas = peca_antiga.casas
+
+        peca_antiga.destroy()
+        casa_antiga.tem_peca = [False, None]
+
+        if tipo == 'peao':
+            nova_peca = Peao(casa, color=cor, pos=casa, tipo=tipo, casas=casas)
+
+        nova_peca.jogou = True
+        casa.tem_peca = [True, nova_peca]
+        nova_peca.grid(row=0, column=0, padx=8, pady=7)
+
+        tirar_circulos(peca_antiga)
+        reset_cores(casas)
+
+        if vez:
+            vez = False
+        else:
+            vez = True
+
+# Função de comer
+def comer(peca):
+    global vez
+
+    casas = peca.casas
+    coluna = peca.pos.pos[0]
+    linha = peca.pos.pos[1]
+
+    # Mov do peão
+    if peca.tipo == 'peao':
+        diagonais = []
+        cond_um = cond_dois = False
+
+        # Peão branco
+        if peca.color == 'branco' and vez:
+            for casa in casas:
+                if peca.pos.pos[0] != 'a' and peca.pos.pos[0] != 'h':
+                    cond_um = letras.index(casa.pos[0]) + 1 == letras.index(coluna) or letras.index(casa.pos[0]) - 1 == letras.index(coluna)
+                    cond_dois = casa.pos[1] - 1 == linha
+
+                else:
+                    if peca.pos.pos[0] == 'a':
+                        cond_um = letras.index(casa.pos[0]) - 1 == letras.index(coluna)
+                        cond_dois = casa.pos[1] - 1 == linha
+                    elif peca.pos.pos[0] == 'h':
+                        cond_um = letras.index(casa.pos[0]) + 1 == letras.index(coluna)
+                        cond_dois = casa.pos[1] - 1 == linha
+
+                if cond_um and cond_dois:
+                    diagonais.append(casa)
+
+            for diagonal in diagonais:
+                if diagonal.tem_peca[0] and diagonal.tem_peca[1].color == 'preto':
+                    diagonal.configure(fg_color='#999900')
+                    diagonal.tem_peca[1].configure(text_color='#999900')
+                    diagonal.circle = CasasCircle(master=diagonal, origem=peca)
+                    peca.casas_jogar.append(diagonal)
+
+        # Peão preto
+        elif peca.color == 'preto' and not vez:
+            for casa in casas:
+                if peca.pos.pos[0] != 'a' and peca.pos.pos[0] != 'h':
+                    cond_um = letras.index(casa.pos[0]) + 1 == letras.index(coluna) or letras.index(casa.pos[0]) - 1 == letras.index(coluna)
+                    cond_dois = casa.pos[1] + 1 == linha
+
+                else:
+                    if peca.pos.pos[0] == 'a':
+                        cond_um = letras.index(casa.pos[0]) - 1 == letras.index(coluna)
+                        cond_dois = casa.pos[1] + 1 == linha
+                    elif peca.pos.pos[0] == 'h':
+                        cond_um = letras.index(casa.pos[0]) + 1 == letras.index(coluna)
+                        cond_dois = casa.pos[1] + 1 == linha
+
+                if cond_um and cond_dois:
+                    diagonais.append(casa)
+
+            for diagonal in diagonais:
+                if diagonal.tem_peca[0] and diagonal.tem_peca[1].color == 'branco':
+                    diagonal.configure(fg_color='#999900')
+                    diagonal.tem_peca[1].configure(text_color='#999900')
+                    diagonal.circle = CasasCircle(master=diagonal, origem=peca)
+                    peca.casas_jogar.append(diagonal)
 
 # Pecas
 # Base
 def func_peca(peca, casas, casas_livres):
-    global act_peca
+    global act_peca, vez, material_preto, material_branco
 
-    if act_peca is not None:
+    old_fg_color = peca.master.cget('fg_color')
+
+    if act_peca is not None and peca.master.cget('fg_color') != '#999900':
         tirar_circulos(act_peca)
 
+    comer(peca)
+
+    if peca.master.cget('fg_color') == '#999900':
+        if peca.color == 'branco':
+            material_preto += peca.value
+        else:
+            material_branco += peca.value
+
+        atualizar_hud_material()
+
+        jogar(peca.master)
+
     act_peca = peca
-    criar_circulos(peca=peca, casas=casas, casas_livres=casas_livres)
+
+    if old_fg_color != '#999900':
+        criar_circulos(peca=peca, casas=casas, casas_livres=casas_livres)
 
 class Peca(CTkButton):
     def __init__(self, master, color, value, pos, tipo, casas, casas_jogar, **kwargs):
@@ -224,6 +435,7 @@ class Peca(CTkButton):
                          hover=False,
                          text='aaaaaa',
                          command=lambda: func_peca(self, casas, atualizar_casas_livres(casas)))
+
         self.color = color
         self.value = value
         self.pos = pos
@@ -248,6 +460,7 @@ class Peao(Peca):
         self.color = color
         self.pos = pos
         self.tipo = tipo
+        self.casas = casas
 
         if self.color == 'branco':
             self.configure(image=PEAO_BRANCO, text_color=pos.cget('fg_color'))
